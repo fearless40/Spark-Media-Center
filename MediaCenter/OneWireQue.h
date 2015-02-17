@@ -24,6 +24,15 @@ const int ROM_ID_SIZE = sizeof(uint8_t) * ROM_ENTRIES;
 
 #ifdef SIMULATION
 
+enum MakeRomFlags
+{
+    MRF_GoUp        = 0x01,
+    MRF_GoDown      = 0x02,
+    MRF_RandMin     = 0x04,
+    MRF_RandMax     = 0x08,
+    MRF_MinToMaxNoMiddle = 0x10
+};
+
 
 /**
     Used Internally to make a fake temperature
@@ -41,15 +50,23 @@ void makeTemp( uint8_t * data, uint8_t id );
     @param[in] rate of change (see genFunc below)
 
     @details
-        genFunc
-        0 = Linear Inc, starts at minTemp and goes to maxTemp. Then goes back down to min temp rateOfChange = amount to increase by. Increases every 4 seconds
+        genFunc Flags
+        Bit 0: Go up
+        Bit 1: Go down
+        Bit 2: Minimal Random variation
+        Bit 3: Max Random variation
+        Bit 4: Min Max, No in between variation
+
+        0 = Linear Inc, starts at minTemp and goes to maxTemp. rateOfChange = amount to increase by. Increases every 4 seconds
         1 = Linear Inc with some mild random variation. (1 to 2 degrees). rateOfChange same as above
         3 = Linear dec
         4 = Linear dec with some mild random variation
         5 = Stable temp, with sudden spikes to high temperature over rateOfChange.
+        6 = Ambient Mode, temp doesn't really change. stays around maxTemp with some mild random variation.
+        7 = Linear Up --> Down. Goes from MinTemp to MaxTemp
 */
 
-void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, uint8_t rateOfChange );
+void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, int8_t rateOfChange, uint16_t freq );
 #endif
 
 /**

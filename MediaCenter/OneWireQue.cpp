@@ -1,6 +1,7 @@
 #include "application.h"
 #include "OneWire.h"
 #include "OneWireQue.h"
+#include "spark_wiring_random.h"
 #include <cstring>
 
 namespace OneWireQue
@@ -47,6 +48,9 @@ struct TempProbes
     uint8_t     rom[8];
     ProbeStatus status;
     char        name[8];
+#ifdef SIMULATION
+    uint32_t    simUpdate;
+#endif
 };
 
 /// The number of probes
@@ -60,32 +64,103 @@ uint16_t        mProbeCurrent;
 
 OneWire * mWire;
 
-ifdef SIMULATION
+#ifdef SIMULATION
+
+
+
 void makeTemp( uint8_t * data, uint8_t id )
 {
     // Uses rom data to figure out how to generate the temp
     // No check to see if the id is bad.
-    TempProbes p = mProbes[id];
-    switch (p.rom[0])   //Switch on genFunc
-    {
-        case 0:
+    TempProbes & p = mProbes[id];
 
+    int8_t rateOfChange = (int8_t)p.rom[3];
+    uint16_t freq = (uint16_t)&p.rom[4];
+    int16_t current = rawWholePart( p.rawValue );
+    int16_t newTemp = 0;
+    int16_t fracTemp = 0;
+
+
+    if( millis() - p.simUpdate < freq )
+    // Not ready for an update to the data
+    // Return but still give back a result
+    {
+        data[0] = p.rawValue & 0xFF;
+        data[1] = (p.rawValue & 0xFF00) >> 8;
+        return;
+    }
+
+    // Update the timer for this simulation probe
+    p.simUpdate = millis();
+
+    if( p.rom[0] & MRF_GoUp || p.rom[0] & MRF_GoDown )
+    {
+        newTemp = current + rateOfChange;
+    }
+
+    if( p.rom[0] & MRF_MinToMaxNoMiddle )
+    {
+        if( rateOfChange = -1)
+            newTemp = p.rom[2]; // Set to min temp
+        if( rateOfChange = 1)
+            newTemp = p.rom[1]; // Set to max temp
+    }
+
+    if( p.rom[0] & MRF_RandMin )
+    {
+        // Generate small random variation
+        fracTemp = random(0,16);
+    }
+
+    if( p.rom[0] & MRF_RandMax )
+    {
+        // Generate large random variation
+        newTemp += random(p.rom[2], p.rom[1]) / 2;
     }
 
 
+    if( newTemp > p.rom[1] )
+    {
+        // Set to the max temp
+        newTemp = p.rom[1];
+        if( p.rom[0] & MRF_GoDown )
+        // We can go down, change the direction
+        {
+           ((int8_t)p.rom[3]) = -rateOfChange;
+        }
+    }
+    else if( newTemp < p.rom[2] )
+    {
+        // Set to min temp
+        newTemp = p.rom[2];
+        if( p.rom[0] & MRF_GoUp )
+        // We can go back up so change the direction
+        {
+            ((int8_t)p.rom[3]) = -rateOfChange;
+        }
+    }
+
+
+    // Generate the final temperature value and return it
+    newTemp = ((newTemp << 4))  + (fracTemp & 0xF); // newTemp * 16 + (4 lower bits of fracTemp)
+    data[0] = newTemp & 0xFF;
+    data[1] = (newTemp & 0xFF00) >> 8;
 
 }
 
 
-void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, uint8_t rateOfChange )
+void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, int8_t rateOfChange, uint16_t freq )
 {
     rom[0] = genFunc;
     rom[1] = maxTemp;
     rom[2] = minTemp;
-    rom[3] = rateOfChange;
+    if( genFunc & MRF_MinToMaxNoMiddle )
+        rateOfChange = 1;
+    (int8_t)rom[3] = rateOfChange;
+    (uint16_t)&rom[4] = freq;
     // rom[4-7] = used internally by makeTemp
 }
-
+#endif
 
 bool setup( int pin, int nbrProbes )
 {
