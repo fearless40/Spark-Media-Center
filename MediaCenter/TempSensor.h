@@ -18,12 +18,9 @@ public:
 
     TempSensor( const TempSensor & t ) : mId(t.mId), mMaxStale( t.mMaxStale ) { }
     TempSensor( int id ) : mId(id), mMaxStale(1000 * 30) { }
-    TempSensor( TempSensor && t )
-    {
-        mId = t.mId;
-        mMaxStale = t.mMaxStale;
-        t.mId = 0xFF;
-    }
+
+
+    TempSensor() : mId(0), mMaxStale(1000 * 30) {}
 
     bool    isTempReady()
     {

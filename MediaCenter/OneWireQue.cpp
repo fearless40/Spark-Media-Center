@@ -74,16 +74,16 @@ void makeTemp( uint8_t * data, uint8_t id )
     // No check to see if the id is bad.
     TempProbes & p = mProbes[id];
 
-    int8_t rateOfChange = (int8_t)p.rom[3];
-    uint16_t freq = (uint16_t)&p.rom[4];
+    int8_t rateOfChange = *((int8_t*)&p.rom[3]);
+    uint16_t freq = *((uint16_t*)&p.rom[4]);
     int16_t current = rawWholePart( p.rawValue );
     int16_t newTemp = 0;
     int16_t fracTemp = 0;
 
 
     if( millis() - p.simUpdate < freq )
-    // Not ready for an update to the data
-    // Return but still give back a result
+        // Not ready for an update to the data
+        // Return but still give back a result
     {
         data[0] = p.rawValue & 0xFF;
         data[1] = (p.rawValue & 0xFF00) >> 8;
@@ -96,6 +96,11 @@ void makeTemp( uint8_t * data, uint8_t id )
     if( p.rom[0] & MRF_GoUp || p.rom[0] & MRF_GoDown )
     {
         newTemp = current + rateOfChange;
+    }
+    else
+    {
+        // Ambient temp mode. Sets temp to max temp
+        newTemp = p.rom[1];
     }
 
     if( p.rom[0] & MRF_MinToMaxNoMiddle )
@@ -119,24 +124,26 @@ void makeTemp( uint8_t * data, uint8_t id )
     }
 
 
+
+
     if( newTemp > p.rom[1] )
     {
         // Set to the max temp
         newTemp = p.rom[1];
-        if( p.rom[0] & MRF_GoDown )
-        // We can go down, change the direction
+        if( p.rom[0] & MRF_GoDown && rateOfChange > 0 )
+            // We can go down, change the direction
         {
-           ((int8_t)p.rom[3]) = -rateOfChange;
+            *((int8_t*)&p.rom[3]) = -rateOfChange;
         }
     }
     else if( newTemp < p.rom[2] )
     {
         // Set to min temp
         newTemp = p.rom[2];
-        if( p.rom[0] & MRF_GoUp )
-        // We can go back up so change the direction
+        if( p.rom[0] & MRF_GoUp && rateOfChange < 0)
+            // We can go back up so change the direction
         {
-            ((int8_t)p.rom[3]) = -rateOfChange;
+            *((int8_t*)&p.rom[3]) = -rateOfChange;
         }
     }
 
@@ -151,13 +158,14 @@ void makeTemp( uint8_t * data, uint8_t id )
 
 void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, int8_t rateOfChange, uint16_t freq )
 {
+
     rom[0] = genFunc;
     rom[1] = maxTemp;
     rom[2] = minTemp;
     if( genFunc & MRF_MinToMaxNoMiddle )
         rateOfChange = 1;
-    (int8_t)rom[3] = rateOfChange;
-    (uint16_t)&rom[4] = freq;
+    *((int8_t*) &rom[3]) = rateOfChange;
+    *((uint16_t*)&rom[4]) = freq;
     // rom[4-7] = used internally by makeTemp
 }
 #endif
@@ -240,11 +248,18 @@ void loop()
             //Probe is now ready for reading
             probe.status = ProbeStatus::Idle;
             selectRom(probe);
+#ifndef SIMULATION
             mWire->write_bit(TC_Read);
             mWire->read_bytes(rawData, 9);
+#else
+            makeTemp(rawData, looper);
+#endif
 
             uint8_t high = rawData[1];
-            uint8_t low = rawData[2];
+            uint8_t low = rawData[0];
+
+
+
             probe.rawValue = (high << 8) | low;
             probe.lastUpdate = millis();
         }
@@ -252,7 +267,9 @@ void loop()
         if( probe.status == ProbeStatus::Request )
         {
             selectRom(probe);
+#ifndef SIMULATION
             mWire->write_bit(TC_Convert);
+#endif
             probe.status = ProbeStatus::Running;
             probe.lastUpdate = millis();
         }
@@ -279,7 +296,7 @@ bool isTempReady( int id, int maxStale )
     }
     else if( probe.status == ProbeStatus::Idle )
     {
-        if( maxStale > (millis() - probe.lastUpdate) )
+        if( maxStale < (millis() - probe.lastUpdate) )
             return false;
         else
             return true;
@@ -351,7 +368,7 @@ float getTempInC( int id )
     if( !isIDOk(id) )
         return 0.0f;
 
-    return (float) (mProbes[id].rawValue / 16);
+    return convertRawTempToC(mProbes[id].rawValue);
 }
 
 float getTempInF( int id )
@@ -359,7 +376,7 @@ float getTempInF( int id )
     if( !isIDOk(id) )
         return 0.0f;
 
-    return (( (float) (mProbes[id].rawValue / 16) * 9.0f) / 5.0f ) + 32.0f;
+    return convertRawTempToF(mProbes[id].rawValue);
 }
 
 uint32_t    getElaspedTimeSinceUpdate(int id)

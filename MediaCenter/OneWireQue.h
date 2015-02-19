@@ -56,14 +56,6 @@ void makeTemp( uint8_t * data, uint8_t id );
         Bit 2: Minimal Random variation
         Bit 3: Max Random variation
         Bit 4: Min Max, No in between variation
-
-        0 = Linear Inc, starts at minTemp and goes to maxTemp. rateOfChange = amount to increase by. Increases every 4 seconds
-        1 = Linear Inc with some mild random variation. (1 to 2 degrees). rateOfChange same as above
-        3 = Linear dec
-        4 = Linear dec with some mild random variation
-        5 = Stable temp, with sudden spikes to high temperature over rateOfChange.
-        6 = Ambient Mode, temp doesn't really change. stays around maxTemp with some mild random variation.
-        7 = Linear Up --> Down. Goes from MinTemp to MaxTemp
 */
 
 void makeRom( uint8_t * rom, uint8_t genFunc, uint8_t maxTemp, uint8_t minTemp, int8_t rateOfChange, uint16_t freq );

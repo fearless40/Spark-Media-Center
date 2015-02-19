@@ -3,8 +3,19 @@
 	<FileVersion major="1" minor="6" />
 	<Project>
 		<Option title="MediaCenter" />
+		<Option makefile="makefile" />
+		<Option makefile_is_custom="1" />
+		<Option execution_dir="../../../build" />
 		<Option pch_mode="2" />
 		<Option compiler="arm-elf-gcc" />
+		<MakeCommands>
+			<Build command="$make APP=MediaCenter TARGET=core-firmware" />
+			<CompileFile command="$make APP=MediaCenter TARGET=core-firmware" />
+			<Clean command="$make clean" />
+			<DistClean command="$make -f $makefile distclean$target" />
+			<AskRebuildNeeded command="" />
+			<SilentBuild command="$make APP=MediaCenter TARGET=core-firmware &gt; $(CMD_NULL)" />
+		</MakeCommands>
 		<Build>
 			<Target title="Debug">
 				<Option output="bin/Debug/MediaCenter" prefix_auto="1" extension_auto="1" />
@@ -13,6 +24,7 @@
 				<Option compiler="arm-elf-gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add directory="include" />
 				</Compiler>
 			</Target>
 			<Target title="Release">
@@ -22,17 +34,42 @@
 				<Option compiler="arm-elf-gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add directory="include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
 				</Linker>
+				<MakeCommands>
+					<Build command="$make APP=MediaCenter TARGET=core-firmware" />
+					<CompileFile command="$make APP=MediaCenter TARGET=core-firmware" />
+					<Clean command="$make clean" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q  APP=MediaCenter TARGET=core-firmware" />
+					<SilentBuild command="$make APP=MediaCenter TARGET=core-firmware &gt; $(CMD_NULL)" />
+				</MakeCommands>
 			</Target>
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Unit filename="FanController.cpp" />
+		<Unit filename="FanController.h" />
+		<Unit filename="FanLogic.cpp" />
+		<Unit filename="FanLogic.h" />
+		<Unit filename="Main.cpp" />
+		<Unit filename="OneWire.cpp" />
+		<Unit filename="OneWire.h" />
+		<Unit filename="OneWireDevice.h" />
+		<Unit filename="OneWireQue" />
+		<Unit filename="OneWireQue.cpp" />
+		<Unit filename="OneWireQue.h" />
+		<Unit filename="TempSensor.h" />
+		<Unit filename="include/FanController.h" />
+		<Unit filename="src/FanController.cpp" />
 		<Extensions>
-			<code_completion />
+			<code_completion>
+				<search_path add="../../../inc" />
+			</code_completion>
 			<debugger />
 		</Extensions>
 	</Project>

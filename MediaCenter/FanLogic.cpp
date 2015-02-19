@@ -8,8 +8,9 @@
 
 const int16_t EmptyTemp = 0xC000;
 
-const int16_t MaxTemp = 20;
+const int16_t MaxTemp = 20 << 4;
 
+TempSensor * FanLogic::mAmbient = nullptr;
 
 FanLogic::FanLogic() :
     mPush(nullptr),
@@ -21,20 +22,22 @@ FanLogic::FanLogic() :
 }
 
 
-FanLogic::FanLogic( FanController * oneFan ) :
-    mPush(oneFan),
+FanLogic::FanLogic( FanController & oneFan, TempSensor & sensor ) :
+    mPush(&oneFan),
     mPull(nullptr),
     mMode(FanLogic::FLM_Standard),
-    mNextEntry(0)
+    mNextEntry(0),
+    mTemp(&sensor)
 {
     init();
 }
 
-FanLogic::FanLogic( FanController * push, FanController * pull ) :
-    mPush(push),
-    mPull(pull),
+FanLogic::FanLogic( FanController & push, FanController & pull, TempSensor & sensor ) :
+    mPush(&push),
+    mPull(&pull),
     mMode(FanLogic::FLM_Standard),
-    mNextEntry(0)
+    mNextEntry(0),
+    mTemp(&sensor)
 {
     init();
 }
@@ -42,15 +45,20 @@ FanLogic::FanLogic( FanController * push, FanController * pull ) :
 void FanLogic::init()
 {
     for( int i=0; i < NbrTempPoints; ++i)
-        mTemps[i] = EmptyTemp;
+    {
+        mTemps[i] = EmptyTemp; //Prevent 0 temperature recordings
+        mTimes[i] = (i+1) * 2; // Prevent division by 0 at startup
+    }
 
-    memset(mTimes,0,sizeof(uint32_t) * NbrTempPoints);
+
+
 }
 
-void FanLogic::initalizeFanLogicControllers( TempSensor * ambient )
+void FanLogic::initalizeFanLogicControllers( TempSensor & ambient )
 {
-    if( ambient )
-        mAmbient = ambient;
+    mAmbient = &ambient;
+    int16_t t;
+    mAmbient->requestTempRaw(t, 1); // Force an update to the ambient temperature
 }
 
 
@@ -74,22 +82,24 @@ void FanLogic::loop()
     newFanSpeed = calculateRequiredPower();
 
 
+    setFanPower(newFanSpeed);
+
     switch( mMode )
     {
 
-        case FLM_PowerDown: //Also FLM_ForceOff...
-            if( newFanSpeed == 0 )
-            {
-                mMode = FLM_LowPower;
-            }
-        case FLM_ForceOn:
-        case FLM_Standard:
-            maxStale = 6000;    // 6 seconds
-            break;
+    case FLM_PowerDown: //Also FLM_ForceOff...
+        if( newFanSpeed == 0 )
+        {
+            mMode = FLM_LowPower;
+        }
+    case FLM_ForceOn:
+    case FLM_Standard:
+        maxStale = 6000;    // 6 seconds
+        break;
 
-        case FLM_LowPower:
-            maxStale = 1000 * 60 * 5; // 5 minutes
-            break;
+    case FLM_LowPower:
+        maxStale = 1000 * 60 * 5; // 5 minutes
+        break;
     }
 
     int16_t rawtemp = 0;
@@ -116,7 +126,7 @@ uint8_t FanLogic::getTempIndice(uint8_t index)
     // Oldest value is going to be pointed at by mNextEntry
     int value = mNextEntry + index;
     if( value >= NbrTempPoints )
-        return NbrTempPoints - value;
+        return value - NbrTempPoints;
     else
         return value;
 }
@@ -129,6 +139,38 @@ uint8_t FanLogic::getFanPower()
     return mPush->getSpeed();
 }
 
+void FanLogic::setFanPower(uint8_t power)
+{
+    if( power == 0)
+    {
+        if(mPush)
+            mPush->off();
+
+
+        if(mPull)
+            mPull->off();
+    }
+    else
+    {
+        if(mPush)
+        {
+            mPush->setSpeed(power);
+            if( !mPush->isOn() )
+                mPush->on();
+        }
+
+
+        if(mPull)
+        {
+            mPull->setSpeed(power);
+            if( !mPull->isOn() )
+                mPull->on();
+        }
+
+    }
+
+
+}
 
 uint8_t  FanLogic::calculateRequiredPower()
 {
@@ -151,42 +193,43 @@ uint8_t  FanLogic::calculateRequiredPower()
     uint8_t first = getTempIndice(First);
     uint8_t last  = getTempIndice(Last);
     int currentSpeed = getFanPower();
+    int16_t diff = OneWireQue::rawWholePart(mTemps[last]) - mAmbient->getRawWholePart();
 
-    if( OneWireQue::convertRawTempToC(mTemps[last] - mAmbient->getRawTemp()) > MaxTemp )
+    if( diff > MaxTemp )
     {
         currentSpeed += 70;
-        return currentSpeed & 0xFF;
+        return (currentSpeed > 255 ? 255 : currentSpeed);
     }
-    if( OneWireQue::rawWholePart(mTemps[last]) - mAmbient->getRawWholePart() == 0 )
+    if( diff == 0 )
     {
         // If ambient temp and measured temp are the same turn off the fans
         return 0;
     }
 
-    int diff =  mTemps[first] - mTemps[last];
-    float slope = OneWireQue::convertRawTempToC(mTemps[first] - mTemps[last]) / (mTimes[last] - mTimes[first]); //Deg C / ms
-    int16_t powerAdjustment = 0;
+
+    float slope = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]); //Deg C / ms
+    int16_t powerAdjustment = diff * 2;
 
     if( slope < -0.0001 )
     {
-        powerAdjustment = -10;
+        powerAdjustment += -10;
         //Temp is dropping
         first = getTempIndice(Last-1);
-        float slope2 = OneWireQue::convertRawTempToC(mTemps[first] - mTemps[last]) / (mTimes[last] - mTimes[first]);
+        float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
 
 
         if( slope2 > slope )
-        // The slope of the most recent measurements is actually less negative, don't decrease fan speed too much
+            // The slope of the most recent measurements is actually less negative, don't decrease fan speed too much
         {
             powerAdjustment += 5;
         }
         else if (slope2 < slope )
-        // Slope negative measurement is more negative than thought, can decrease fan speed more
+            // Slope negative measurement is more negative than thought, can decrease fan speed more
         {
             powerAdjustment -= 5;
         }
         else
-        // Slope is about the same don't make any fine tuning
+            // Slope is about the same don't make any fine tuning
         {
         }
 
@@ -201,24 +244,24 @@ uint8_t  FanLogic::calculateRequiredPower()
     if( slope > 0.0001 )
     {
         // Temp is increasing
-        powerAdjustment = 10;
+        powerAdjustment += 10;
         //Temp is dropping
         first = getTempIndice(Last-1);
-        float slope2 = OneWireQue::convertRawTempToC(mTemps[first] - mTemps[last]) / (mTimes[last] - mTimes[first]);
+        float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
 
 
         if( slope2 > slope )
-        // The slope of the most recent measurements is actually more positive , increase fan speed more
+            // The slope of the most recent measurements is actually more positive , increase fan speed more
         {
             powerAdjustment += 5;
         }
         else if (slope2 < slope )
-        // Slope positive measurement is less positive than thought, can decrease fan speed more
+            // Slope positive measurement is less positive than thought, can decrease fan speed more
         {
             powerAdjustment -= 5;
         }
         else
-        // Slope is about the same don't make any fine tuning
+            // Slope is about the same don't make any fine tuning
         {
         }
 

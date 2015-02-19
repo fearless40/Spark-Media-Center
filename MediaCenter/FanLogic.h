@@ -72,11 +72,11 @@ protected:
 public:
 
     FanLogic();
-    FanLogic( FanController * oneFan );
-    FanLogic( FanController * push, FanController * pull );
+    FanLogic( FanController & oneFan, TempSensor & sensor );
+    FanLogic( FanController & push, FanController & pull, TempSensor & sensor );
 
 
-    static void initalizeFanLogicControllers( TempSensor * ambient );
+    static void initalizeFanLogicControllers( TempSensor & ambient );
 
     void setup();
     void loop();

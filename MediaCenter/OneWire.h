@@ -1,4 +1,3 @@
-
 #ifndef __ONEWIRE__
 #define __ONEWIRE__
 
@@ -26,14 +25,14 @@
 
 class OneWire
 {
-  private:
+private:
 
-	uint16_t _pin;
-	void DIRECT_WRITE_LOW(void);
-	void DIRECT_MODE_OUTPUT(void);
-	void DIRECT_WRITE_HIGH(void);
-	void DIRECT_MODE_INPUT(void);
-	uint8_t DIRECT_READ(void);
+    uint16_t _pin;
+    void DIRECT_WRITE_LOW(void);
+    void DIRECT_MODE_OUTPUT(void);
+    void DIRECT_WRITE_HIGH(void);
+    void DIRECT_MODE_INPUT(void);
+    uint8_t DIRECT_READ(void);
 #if ONEWIRE_SEARCH
     // global search state
     unsigned char ROM_NO[8];
@@ -42,7 +41,7 @@ class OneWire
     uint8_t LastDeviceFlag;
 #endif
 
-  public:
+public:
     OneWire( uint16_t pin);
 
     // Perform a 1-Wire reset cycle. Returns 1 if a device responds
