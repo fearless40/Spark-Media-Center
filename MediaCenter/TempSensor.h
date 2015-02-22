@@ -12,15 +12,14 @@ class TempSensor
 protected:
 
     uint8_t         mId;
-    uint32_t        mMaxStale;
 
 public:
 
-    TempSensor( const TempSensor & t ) : mId(t.mId), mMaxStale( t.mMaxStale ) { }
-    TempSensor( int id ) : mId(id), mMaxStale(1000 * 30) { }
+    TempSensor( const TempSensor & t ) : mId(t.mId) { }
+    TempSensor( int id ) : mId(id) { }
 
 
-    TempSensor() : mId(0), mMaxStale(1000 * 30) {}
+    TempSensor() : mId(0) {}
 
     bool    isTempReady()
     {
@@ -29,35 +28,20 @@ public:
 
     bool    requestTempInC(float & temp, uint32_t maxStale )
     {
-        mMaxStale = maxStale;
         return OneWireQue::requestTempInC(mId, temp, maxStale);
     }
 
-    bool    requestTempInC(float & temp )
-    {
-        return OneWireQue::requestTempInC(mId, temp, mMaxStale);
-    }
 
     bool    requestTempInF(float & temp, uint32_t maxStale )
     {
-        mMaxStale = maxStale;
-        return OneWireQue::requestTempInF(mId, temp, maxStale);
-    }
 
-    bool    requestTempInF(float & temp )
-    {
-        return OneWireQue::requestTempInF(mId, temp, mMaxStale);
+        return OneWireQue::requestTempInF(mId, temp, maxStale);
     }
 
     bool    requestTempRaw(int16_t & temp, uint32_t maxStale )
     {
-        mMaxStale = maxStale;
-        return OneWireQue::requestTempRaw(mId, temp, maxStale);
-    }
 
-    bool    requestTempInF(int16_t & temp )
-    {
-        return OneWireQue::requestTempRaw(mId, temp, mMaxStale);
+        return OneWireQue::requestTempRaw(mId, temp, maxStale);
     }
 
 

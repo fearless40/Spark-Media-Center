@@ -249,19 +249,21 @@ void FanController::startMeasureTach()
 {
     mTachCount = 0;
     counter[pinToIndex()] = 0;
+    mTachTimer = millis();
     setInterrupt();
-    //attachInterrupt( mTachPin, pinToInterrupt(), RISING );
+
 }
 
 void FanController::stopMeasureTach()
 {
     detachInterrupt( mTachPin );
+    mTachTimer = millis() - mTachTimer;
     mTachCount = counter[pinToIndex()];
 }
 
 int FanController::getRPM()
 {
-    return (mTachCount*60 / 2);
+    return  ((mTachCount/2)*6000) /mTachTimer;
 }
 
 void FanController::resetTach()

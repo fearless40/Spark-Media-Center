@@ -8,7 +8,9 @@
 
 const int16_t EmptyTemp = 0xC000;
 
-const int16_t MaxTemp = 20 << 4;
+const int16_t MaxTemp = 50;  // About 50 degrees centigrade
+
+const int MinTimeToAddNewDataPoint = 2500; // milliseconds
 
 TempSensor * FanLogic::mAmbient = nullptr;
 
@@ -70,49 +72,67 @@ void FanLogic::setup()
 void FanLogic::loop()
 {
     // Only run the loop every few seconds
-
-    if( millis() - mInternalTimer < 4000 )
-        return;
-
-    mInternalTimer = millis();
-
-
     uint32_t  maxStale = 2000;
-    uint8_t newFanSpeed;
-    newFanSpeed = calculateRequiredPower();
-
-
-    setFanPower(newFanSpeed);
-
-    switch( mMode )
-    {
-
-    case FLM_PowerDown: //Also FLM_ForceOff...
-        if( newFanSpeed == 0 )
-        {
-            mMode = FLM_LowPower;
-        }
-    case FLM_ForceOn:
-    case FLM_Standard:
-        maxStale = 6000;    // 6 seconds
-        break;
-
-    case FLM_LowPower:
-        maxStale = 1000 * 60 * 5; // 5 minutes
-        break;
-    }
-
     int16_t rawtemp = 0;
+    uint8_t newFanSpeed;
+
     if( mTemp->requestTempRaw( rawtemp, maxStale ) == true )
     {
+
+        if( millis() - mInternalTimer < MinTimeToAddNewDataPoint )
+            return;
+
+        // Run logic every few seconds
+        mInternalTimer = millis();
+
         addTemp( rawtemp );
+
+
+        newFanSpeed = calculateRequiredPower();
+
+
+        setFanPower(newFanSpeed);
     }
+    else
+    {
+        return; // No new data so not worth checking fan speed
+    }
+
+
+    /*    if( millis() - mInternalTimer < 4000 )
+            return;
+
+        mInternalTimer = millis();
+    */
+
+
+
+    /*    switch( mMode )
+        {
+
+        case FLM_PowerDown: //Also FLM_ForceOff...
+            if( newFanSpeed == 0 )
+            {
+                mMode = FLM_LowPower;
+            }
+        case FLM_ForceOn:
+        case FLM_Standard:
+            maxStale = 2000;    // 2 seconds
+            break;
+
+        case FLM_LowPower:
+            maxStale = 1000 * 60 * 5; // 5 minutes
+            break;
+        }
+    */
 
 }
 
 
 void     FanLogic::addTemp( int16_t temp )
 {
+
+
     mTemps[mNextEntry] = temp;
     mTimes[mNextEntry] = millis();
     mNextEntry++;
@@ -174,8 +194,8 @@ void FanLogic::setFanPower(uint8_t power)
 
 uint8_t  FanLogic::calculateRequiredPower()
 {
-    const int Last = NbrTempPoints - 1;
-    const int First = 0;
+    const int Last = NbrTempPoints - 1; // Newest
+    const int First = 0;                // Oldest
 
     // Does not worry at the accuracy of the temp. That is checked else where.
     // This function only worries about what it currently knows and the trend that
@@ -192,7 +212,7 @@ uint8_t  FanLogic::calculateRequiredPower()
 
     uint8_t first = getTempIndice(First);
     uint8_t last  = getTempIndice(Last);
-    int currentSpeed = getFanPower();
+    int16_t currentSpeed = getFanPower();
     int16_t diff = OneWireQue::rawWholePart(mTemps[last]) - mAmbient->getRawWholePart();
 
     if( diff > MaxTemp )
@@ -208,11 +228,11 @@ uint8_t  FanLogic::calculateRequiredPower()
 
 
     float slope = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]); //Deg C / ms
-    int16_t powerAdjustment = diff * 2;
+    int16_t powerAdjustment = 0;
 
     if( slope < -0.0001 )
     {
-        powerAdjustment += -10;
+        powerAdjustment -= 10;
         //Temp is dropping
         first = getTempIndice(Last-1);
         float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
@@ -233,19 +253,17 @@ uint8_t  FanLogic::calculateRequiredPower()
         {
         }
 
-        return currentSpeed + powerAdjustment;
-
     }
     else if( slope >= -0.0001 && slope <= 0.0001 )
     {
         // Temp is not changing
-        return currentSpeed;
+        powerAdjustment = 0;
     }
-    if( slope > 0.0001 )
+    else if( slope > 0.0001 )
     {
         // Temp is increasing
         powerAdjustment += 10;
-        //Temp is dropping
+
         first = getTempIndice(Last-1);
         float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
 
@@ -264,8 +282,14 @@ uint8_t  FanLogic::calculateRequiredPower()
             // Slope is about the same don't make any fine tuning
         {
         }
-
-        return currentSpeed + powerAdjustment;
     }
+
+    // PWM duty cycle does not effect fans below 30 percent
+
+    if( currentSpeed < 30 )
+    {
+        currentSpeed = 30;
+    }
+    return currentSpeed + powerAdjustment;
 
 }

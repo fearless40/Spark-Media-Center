@@ -7,7 +7,7 @@ class TempSensor;
 
 class FanLogic
 {
-protected:
+public:
 
     static const int NbrTempPoints = 4;
 

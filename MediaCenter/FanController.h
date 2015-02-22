@@ -15,6 +15,7 @@ protected:
     uint8_t mTachPin;
     uint32_t mState;
     uint32_t mTachCount;
+    int32_t  mTachTimer;
 
     // Interrupt functions
     static volatile int counter[12];

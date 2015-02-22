@@ -2,7 +2,7 @@
 #define __ONEWIREQUE__
 
 // Hardwired as I know exactly what is connected to this particular spark core
-#define SIMULATION
+#undef SIMULATION
 
 /**
     A simple que of one wire devices that works in a simple fashion.

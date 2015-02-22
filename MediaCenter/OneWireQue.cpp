@@ -221,10 +221,10 @@ void selectRom( TempProbes & probe )
     mWire->reset();
 
     // Tell the device who the next command is for
-    mWire->write_bit(RC_Match);
+    mWire->write(RC_Match);
 
     // Send the rom that we are looking for
-    mWire->write_bytes(probe.rom, 8, 0);
+    mWire->write_bytes(probe.rom, 8, false);
 
 #endif
 }
@@ -249,7 +249,7 @@ void loop()
             probe.status = ProbeStatus::Idle;
             selectRom(probe);
 #ifndef SIMULATION
-            mWire->write_bit(TC_Read);
+            mWire->write(TC_Read);
             mWire->read_bytes(rawData, 9);
 #else
             makeTemp(rawData, looper);
@@ -268,7 +268,7 @@ void loop()
         {
             selectRom(probe);
 #ifndef SIMULATION
-            mWire->write_bit(TC_Convert);
+            mWire->write(TC_Convert);
 #endif
             probe.status = ProbeStatus::Running;
             probe.lastUpdate = millis();
@@ -389,12 +389,12 @@ uint32_t    getElaspedTimeSinceUpdate(int id)
 
 float convertRawTempToC( int16_t rawtemp )
 {
-    return (float) (rawtemp / 16);
+    return ((float)rawtemp / 16.0f);
 }
 
 float convertRawTempToF( int16_t rawtemp )
 {
-    return (((rawtemp/16) * 9.0f) / 5.0f) + 32.0f;
+    return ((((float)rawtemp/16.0f) * 9.0f) / 5.0f) + 32.0f;
 }
 
 int16_t rawWholePart( int16_t rawTemp )
