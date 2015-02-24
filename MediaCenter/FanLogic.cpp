@@ -220,7 +220,7 @@ uint8_t  FanLogic::calculateRequiredPower()
         currentSpeed += 70;
         return (currentSpeed > 255 ? 255 : currentSpeed);
     }
-    if( diff == 0 )
+    if( diff <= 0 )
     {
         // If ambient temp and measured temp are the same turn off the fans
         return 0;

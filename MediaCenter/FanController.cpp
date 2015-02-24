@@ -53,19 +53,10 @@ void FanController::interruptA7()
 }
 
 void FanController::setOn(bool ison)
-
 {
-    int low = StatePower & mState;
-    int high = ison == true ? 1 : 0;
-    mState = (high << 8) + low;
+    mMode = (ison == true ? 1 : 0);
 }
 
-void FanController::setPower(int power)
-{
-    int high = StateOnOff & mState;
-    int low = power & StatePower;
-    mState = high + low;
-}
 
 int FanController::pinToIndex()
 {
@@ -177,16 +168,18 @@ void FanController::setInterrupt()
 
 FanController::FanController( int onOffPin, int pwmPin, int tachPin) :
     mOnOffPin( onOffPin ),
-    mPwmPin( mPwmPin ),
+    mPwmPin( pwmPin ),
     mTachPin( tachPin ),
-    mState(0)
+    mPower(0),
+    mMode(0)
 {}
 
 FanController::FanController() :
     mOnOffPin( 0 ),
     mPwmPin( 0 ),
     mTachPin( 0 ),
-    mState(0)
+    mPower(0),
+    mMode(0)
 {}
 
 void FanController::setup( int onOffPin, int pwmPin, int tachPin )
@@ -215,13 +208,13 @@ void FanController::setSpeed(int speed)
     if( speed < 0 )
         speed = 0;
 
-    setPower( speed );
+    mPower = speed;
     analogWrite( mPwmPin, speed );
 }
 
 bool FanController::isOn()
 {
-    if( ((mState & StateOnOff)>> 8) == 1 )
+    if( mMode == 1 )
         return true;
     else
         return false;
@@ -229,7 +222,7 @@ bool FanController::isOn()
 
 int FanController::getSpeed()
 {
-    return mState & StatePower;
+    return mPower;
 }
 
 void FanController::on()

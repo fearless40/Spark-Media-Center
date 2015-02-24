@@ -13,7 +13,8 @@ protected:
     uint8_t mOnOffPin;
     uint8_t mPwmPin;
     uint8_t mTachPin;
-    uint32_t mState;
+    uint8_t mPower;
+    uint8_t mMode;
     uint32_t mTachCount;
     int32_t  mTachTimer;
 
@@ -34,13 +35,11 @@ protected:
     static void interruptA7();
 
 
-    const int StateOnOff = 0xFF00;
-    const int StatePower = 0x00FF;
+
 
 
     // Helper Functions
     void setOn(bool ison);
-    void setPower(int power);
     int pinToIndex();
     void setInterrupt();
 
