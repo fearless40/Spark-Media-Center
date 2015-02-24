@@ -10,6 +10,9 @@ class FanLogic
 public:
 
     static const int NbrTempPoints = 4;
+    static const int SampleTime = 2500;
+
+
 
     enum FanLogicModes
     {
@@ -19,6 +22,14 @@ public:
         FLM_ForceOn,        // Keep the fans on at the given power value. If however temp is too high ok to increase fan speed
         FLM_ForceOff        // Try to turn the fans off. If temp too high keep the fans on.
     };
+
+
+    float       mIterm;
+    float       mLastInput;
+    float       mKi;
+    float       mKd;
+    float       mKp;
+
 
     uint8_t    mMode;
 
@@ -81,6 +92,9 @@ public:
     void setup();
     void loop();
 
+
+
+    void setTuningParameters( float kp, float ki, float kd );
 
     // Starts more freq checking of the temp sensor
     void setPowerOnMode();

@@ -12,6 +12,13 @@ const int16_t MaxTemp = 50;  // About 50 degrees centigrade
 
 const int MinTimeToAddNewDataPoint = 2500; // milliseconds
 
+const float AmountAboveAmbient = 2;
+
+const float OutMax = 255;
+
+const float OutMin = 0;
+
+
 TempSensor * FanLogic::mAmbient = nullptr;
 
 FanLogic::FanLogic() :
@@ -53,6 +60,9 @@ void FanLogic::init()
     }
 
 
+    mKi = -1.2;
+    mKd = -.04;
+    mKp = -.5;
 
 }
 
@@ -69,17 +79,25 @@ void FanLogic::setup()
     // Do nothing for now
 }
 
+void FanLogic::setTuningParameters( float kp, float ki, float kd )
+{
+    float SampleInSec = SampleTime / 1000;
+    mKp =0 - (kp / SampleInSec);
+    mKd =0 - (kd / SampleInSec);
+    mKi =0 - (ki * SampleInSec);
+}
+
 void FanLogic::loop()
 {
     // Only run the loop every few seconds
-    uint32_t  maxStale = 2000;
+    uint32_t  maxStale = 1800;
     int16_t rawtemp = 0;
     uint8_t newFanSpeed;
 
     if( mTemp->requestTempRaw( rawtemp, maxStale ) == true )
     {
 
-        if( millis() - mInternalTimer < MinTimeToAddNewDataPoint )
+        if( millis() - mInternalTimer < SampleTime )
             return;
 
         // Run logic every few seconds
@@ -197,6 +215,32 @@ uint8_t  FanLogic::calculateRequiredPower()
     const int Last = NbrTempPoints - 1; // Newest
     const int First = 0;                // Oldest
 
+
+    float input = OneWireQue::convertRawTempToC(mTemps[getTempIndice(Last)]);
+    float error = input - (mAmbient->getTempInC() + AmountAboveAmbient);
+
+    mIterm += mKi * error;
+
+    if( mIterm > OutMax )
+        mIterm = OutMax;
+
+    else if( mIterm < OutMin )
+        mIterm = OutMin;
+
+    float dInput = (input - mLastInput);
+
+    float output = mKp * error + mIterm - (mKd * dInput);
+
+    if( output > OutMax )
+        output = OutMax;
+
+    else if( output < OutMin )
+        output = OutMin;
+
+    mLastInput = input;
+
+    return (uint8_t) output;
+
     // Does not worry at the accuracy of the temp. That is checked else where.
     // This function only worries about what it currently knows and the trend that
     // it is seeing.
@@ -210,6 +254,8 @@ uint8_t  FanLogic::calculateRequiredPower()
     // A few gotchas: if the temp is getting too hot then ignore slope calculations and work
     // on temp to bring the temperature back into line.
 
+
+
     uint8_t first = getTempIndice(First);
     uint8_t last  = getTempIndice(Last);
     int16_t currentSpeed = getFanPower();
@@ -220,7 +266,7 @@ uint8_t  FanLogic::calculateRequiredPower()
         currentSpeed += 70;
         return (currentSpeed > 255 ? 255 : currentSpeed);
     }
-    if( diff <= 0 )
+    if( diff <= 1 )
     {
         // If ambient temp and measured temp are the same turn off the fans
         return 0;

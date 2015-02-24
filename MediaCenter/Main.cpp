@@ -23,6 +23,7 @@ FanLogic    PowerLogic( PowerFan, PowerTemp );
 
 char   stats[512];
 char   stats2[512];
+char   stats3[128];
 
 
 float tempInC = 0;
@@ -44,6 +45,19 @@ void ReadSingleRom
     sprintf( stats, "High: %u %u %u %u %u %u %u %u", read[7], read[6], read[5], read[4], read[3], read[2], read[1], read[0]);
 }
 */
+
+int ChangeInputs(String data)
+{
+    float kp, ki, kd;
+    data.toCharArray( stats3, 128 );
+    sscanf( stats3, "%f %f %f", &kp, &ki, &kd );
+
+
+
+    AmplifierLogic.setTuningParameters(kp,ki,kd);
+
+    sprintf( stats3, "kp:%f ki:%f kd:%f", kp, ki, kd);
+}
 
 void setup()
 {
@@ -81,10 +95,10 @@ void setup()
     PowerFan.setup();
     RecieverFan.setup();
 
-    Spark.variable("FanSpeed", &fanSpeed, INT);
-    Spark.variable("Temp", &tempInC, DOUBLE);
+    Spark.variable("Stats3", stats3,STRING);
     Spark.variable("Stats", stats, STRING );
     Spark.variable("Stats2", stats2, STRING );
+    Spark.function("Change", ChangeInputs );
     //Spark.variable("RPM", &tachs, INT);
     milli = millis();
 
@@ -148,7 +162,9 @@ float t;
     AmplifierLogic.loop();
     RecieverLogic.loop();
     PowerLogic.loop();
-
+    AmplifierPush.off();
+    RecieverFan.off();
+    PowerFan.off();
 
     sprintf( stats2, "Amp Speed: %u  Rec Speed: %u  Power Speed: %u",   AmplifierPush.isOn() ? AmplifierPush.getSpeed() : 0,
                                                                         RecieverFan.isOn() ? RecieverFan.getSpeed() : 0,
