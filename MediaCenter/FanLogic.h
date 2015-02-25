@@ -24,12 +24,15 @@ public:
     };
 
 
+// PID Values
     float       mIterm;
     float       mLastInput;
     float       mKi;
     float       mKd;
     float       mKp;
+    float       mGoalTemp;
 
+    uint8_t     calculatePID();
 
     uint8_t    mMode;
 
@@ -39,6 +42,7 @@ public:
     // Used to calculate change in temp data
     // data is stored in raw temp format. Uses less memory and does not require floating point math
     int16_t    mTemps[NbrTempPoints];
+    int16_t    mLongTemps[NbrTempPoints];
     uint32_t   mTimes[NbrTempPoints];
 
     // Internal timer used by the loop function

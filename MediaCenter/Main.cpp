@@ -130,7 +130,11 @@ float t;
 //    AmplifierTemp.requestTempInC(t,1000);
 //    PowerTemp.requestTempInC(t,1000);
 //    RecieverTemp.requestTempInC(t,1000);
-    sprintf(stats, "Ambient: %f  Amp: %f  Rec: %f  Power: %f", AmbientTemp.getTempInC(), AmplifierTemp.getTempInC(), RecieverTemp.getTempInC(), PowerTemp.getTempInC());
+    sprintf(stats, "Ambient: %f Amp: %f Rec: %f Power: %f \n                   Amp: %u        Rec: %u        Power: %u",
+     AmbientTemp.getTempInC(), AmplifierTemp.getTempInC(), RecieverTemp.getTempInC(), PowerTemp.getTempInC(),
+      AmplifierPush.isOn() ? AmplifierPush.getSpeed() : 0, RecieverFan.isOn() ? RecieverFan.getSpeed() : 0,
+     PowerFan.isOn() ? PowerFan.getSpeed() : 0);
+
 
 /*
     if( millis() - milli > 1000 )
@@ -162,13 +166,6 @@ float t;
     AmplifierLogic.loop();
     RecieverLogic.loop();
     PowerLogic.loop();
-    AmplifierPush.off();
-    RecieverFan.off();
-    PowerFan.off();
-
-    sprintf( stats2, "Amp Speed: %u  Rec Speed: %u  Power Speed: %u",   AmplifierPush.isOn() ? AmplifierPush.getSpeed() : 0,
-                                                                        RecieverFan.isOn() ? RecieverFan.getSpeed() : 0,
-                                                                        PowerFan.isOn() ? PowerFan.getSpeed() : 0);
 
 }
 

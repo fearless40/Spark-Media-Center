@@ -8,15 +8,19 @@
 
 const int16_t EmptyTemp = 0xC000;
 
-const int16_t MaxTemp = 50;  // About 50 degrees centigrade
+const int16_t MaxTemp = 50 * 16;  // About 50 degrees centigrade
 
 const int MinTimeToAddNewDataPoint = 2500; // milliseconds
 
 const float AmountAboveAmbient = 2;
 
+const int16_t TempRejectionValue = 20 * 16;
+
 const float OutMax = 255;
 
 const float OutMin = 0;
+
+const int MostRecentTimeSample = FanLogic::NbrTempPoints - 1;
 
 
 TempSensor * FanLogic::mAmbient = nullptr;
@@ -60,9 +64,9 @@ void FanLogic::init()
     }
 
 
-    mKi = -1.2;
-    mKd = -.04;
-    mKp = -.5;
+    mKi = 0.8;
+    mKd = 0.4;
+    mKp = 6;
 
 }
 
@@ -82,15 +86,15 @@ void FanLogic::setup()
 void FanLogic::setTuningParameters( float kp, float ki, float kd )
 {
     float SampleInSec = SampleTime / 1000;
-    mKp =0 - (kp / SampleInSec);
-    mKd =0 - (kd / SampleInSec);
-    mKi =0 - (ki * SampleInSec);
+    mKp = kp / SampleInSec;
+    mKd = kd / SampleInSec;
+    mKi = ki * SampleInSec;
 }
 
 void FanLogic::loop()
 {
     // Only run the loop every few seconds
-    uint32_t  maxStale = 1800;
+    uint32_t  maxStale = 2000;
     int16_t rawtemp = 0;
     uint8_t newFanSpeed;
 
@@ -150,6 +154,17 @@ void FanLogic::loop()
 void     FanLogic::addTemp( int16_t temp )
 {
 
+    // Also want to throw out garbage data if we receive garbage data store the
+    // last data point.
+    // Garbage data is determied as follows:
+    //  if abs(temp - mTemps[mNextEntry-1]) > 20 then check it it against
+
+    int16_t priorTemp = mTemps[getTempIndice(NbrTempPoints - 1)];
+
+    if( priorTemp != EmptyTemp && abs(temp - priorTemp) > TempRejectionValue)
+    {
+        temp = priorTemp;
+    }
 
     mTemps[mNextEntry] = temp;
     mTimes[mNextEntry] = millis();
@@ -210,14 +225,18 @@ void FanLogic::setFanPower(uint8_t power)
 
 }
 
-uint8_t  FanLogic::calculateRequiredPower()
+uint8_t     FanLogic::calculatePID()
 {
-    const int Last = NbrTempPoints - 1; // Newest
-    const int First = 0;                // Oldest
 
+    float input = OneWireQue::convertRawTempToC(mTemps[getTempIndice(MostRecentTimeSample)]);
+    float error = input - (mAmbient->getTempInC() + AmountAboveAmbient);  // Above ambient controls acceptable temperatures
 
-    float input = OneWireQue::convertRawTempToC(mTemps[getTempIndice(Last)]);
-    float error = input - (mAmbient->getTempInC() + AmountAboveAmbient);
+    if( error <= 0)
+    // If we are cooler than ambient or close to ambient then shut off
+    {
+        mIterm = 0;
+        return 0;
+    }
 
     mIterm += mKi * error;
 
@@ -240,6 +259,17 @@ uint8_t  FanLogic::calculateRequiredPower()
     mLastInput = input;
 
     return (uint8_t) output;
+
+
+}
+
+uint8_t  FanLogic::calculateRequiredPower()
+{
+
+    return calculatePID();
+
+    const int Last = NbrTempPoints - 1; // Newest
+    const int First = 0;                // Oldest
 
     // Does not worry at the accuracy of the temp. That is checked else where.
     // This function only worries about what it currently knows and the trend that
