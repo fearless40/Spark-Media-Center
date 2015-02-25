@@ -20,7 +20,7 @@ const float OutMax = 255;
 
 const float OutMin = 0;
 
-const int MostRecentTimeSample = FanLogic::NbrTempPoints - 1;
+const int LongTempsIntervalTime = 1000 * 60 * 60;   // At 1 minute intervals
 
 
 TempSensor * FanLogic::mAmbient = nullptr;
@@ -28,8 +28,7 @@ TempSensor * FanLogic::mAmbient = nullptr;
 FanLogic::FanLogic() :
     mPush(nullptr),
     mPull(nullptr),
-    mMode(FanLogic::FLM_Standard),
-    mNextEntry(0)
+    mMode(FanLogic::FLM_Standard)
 {
     init();
 }
@@ -39,7 +38,6 @@ FanLogic::FanLogic( FanController & oneFan, TempSensor & sensor ) :
     mPush(&oneFan),
     mPull(nullptr),
     mMode(FanLogic::FLM_Standard),
-    mNextEntry(0),
     mTemp(&sensor)
 {
     init();
@@ -49,7 +47,6 @@ FanLogic::FanLogic( FanController & push, FanController & pull, TempSensor & sen
     mPush(&push),
     mPull(&pull),
     mMode(FanLogic::FLM_Standard),
-    mNextEntry(0),
     mTemp(&sensor)
 {
     init();
@@ -57,12 +54,10 @@ FanLogic::FanLogic( FanController & push, FanController & pull, TempSensor & sen
 
 void FanLogic::init()
 {
-    for( int i=0; i < NbrTempPoints; ++i)
-    {
-        mTemps[i] = EmptyTemp; //Prevent 0 temperature recordings
-        mTimes[i] = (i+1) * 2; // Prevent division by 0 at startup
-    }
 
+    mTemps.fill(EmptyTemp);
+    mTimes.fill(0);
+    mLongTemps.fill(EmptyTemp);
 
     mKi = 0.8;
     mKd = 0.4;
@@ -101,11 +96,8 @@ void FanLogic::loop()
     if( mTemp->requestTempRaw( rawtemp, maxStale ) == true )
     {
 
-        if( millis() - mInternalTimer < SampleTime )
+        if( !mInternalTimer.interval(SampleTime) )
             return;
-
-        // Run logic every few seconds
-        mInternalTimer = millis();
 
         addTemp( rawtemp );
 
@@ -159,30 +151,22 @@ void     FanLogic::addTemp( int16_t temp )
     // Garbage data is determied as follows:
     //  if abs(temp - mTemps[mNextEntry-1]) > 20 then check it it against
 
-    int16_t priorTemp = mTemps[getTempIndice(NbrTempPoints - 1)];
+    int16_t priorTemp = mTemps.newest();
 
     if( priorTemp != EmptyTemp && abs(temp - priorTemp) > TempRejectionValue)
     {
         temp = priorTemp;
     }
+    else if ( mLongTempsTimer.interval( LongTempsIntervalTime ) )
+    {
+        mLongTemps.add( temp );
+    }
 
-    mTemps[mNextEntry] = temp;
-    mTimes[mNextEntry] = millis();
-    mNextEntry++;
-    if( mNextEntry >= NbrTempPoints )
-        mNextEntry = 0;
+    mTemps.add( temp );
+    mTimes.add(millis() );
+
 }
 
-uint8_t FanLogic::getTempIndice(uint8_t index)
-{
-
-    // Oldest value is going to be pointed at by mNextEntry
-    int value = mNextEntry + index;
-    if( value >= NbrTempPoints )
-        return value - NbrTempPoints;
-    else
-        return value;
-}
 
 uint8_t FanLogic::getFanPower()
 {
@@ -228,7 +212,7 @@ void FanLogic::setFanPower(uint8_t power)
 uint8_t     FanLogic::calculatePID()
 {
 
-    float input = OneWireQue::convertRawTempToC(mTemps[getTempIndice(MostRecentTimeSample)]);
+    float input = OneWireQue::convertRawTempToC(mTemps.newest());
     float error = input - (mAmbient->getTempInC() + AmountAboveAmbient);  // Above ambient controls acceptable temperatures
 
     if( error <= 0)
@@ -268,8 +252,6 @@ uint8_t  FanLogic::calculateRequiredPower()
 
     return calculatePID();
 
-    const int Last = NbrTempPoints - 1; // Newest
-    const int First = 0;                // Oldest
 
     // Does not worry at the accuracy of the temp. That is checked else where.
     // This function only worries about what it currently knows and the trend that
@@ -286,10 +268,9 @@ uint8_t  FanLogic::calculateRequiredPower()
 
 
 
-    uint8_t first = getTempIndice(First);
-    uint8_t last  = getTempIndice(Last);
+
     int16_t currentSpeed = getFanPower();
-    int16_t diff = OneWireQue::rawWholePart(mTemps[last]) - mAmbient->getRawWholePart();
+    int16_t diff = OneWireQue::rawWholePart(mTemps.newest()) - mAmbient->getRawWholePart();
 
     if( diff > MaxTemp )
     {
@@ -303,15 +284,14 @@ uint8_t  FanLogic::calculateRequiredPower()
     }
 
 
-    float slope = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]); //Deg C / ms
+    float slope = OneWireQue::convertRawTempToC(mTemps.newest() - mTemps.oldest()) / (mTimes.newest() - mTimes.oldest()); //Deg C / ms
     int16_t powerAdjustment = 0;
 
     if( slope < -0.0001 )
     {
         powerAdjustment -= 10;
         //Temp is dropping
-        first = getTempIndice(Last-1);
-        float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
+        float slope2 = OneWireQue::convertRawTempToC(mTemps.newest() - mTemps[LoopArray<int16_t,4>::NewestEntryIndex - 1 ]) / (mTimes.newest() - mTimes[LoopArray<int32_t,4>::NewestEntryIndex - 1]);
 
 
         if( slope2 > slope )
@@ -340,8 +320,7 @@ uint8_t  FanLogic::calculateRequiredPower()
         // Temp is increasing
         powerAdjustment += 10;
 
-        first = getTempIndice(Last-1);
-        float slope2 = OneWireQue::convertRawTempToC(mTemps[last] - mTemps[first]) / (mTimes[last] - mTimes[first]);
+        float slope2 = OneWireQue::convertRawTempToC(mTemps.newest() - mTemps[LoopArray<int16_t,4>::NewestEntryIndex - 1 ]) / (mTimes.newest() - mTimes[LoopArray<int32_t,4>::NewestEntryIndex - 1]);
 
 
         if( slope2 > slope )

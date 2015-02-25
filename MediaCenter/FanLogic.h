@@ -2,6 +2,8 @@
 #define __FANLOGIC__
 
 #include <cstdint>
+#include "LoopArray.h"
+#include "Timer.h"
 
 class TempSensor;
 
@@ -9,7 +11,6 @@ class FanLogic
 {
 public:
 
-    static const int NbrTempPoints = 4;
     static const int SampleTime = 2500;
 
 
@@ -36,21 +37,23 @@ public:
 
     uint8_t    mMode;
 
-    // What is the valid entry to store the next temp data into
-    int8_t    mNextEntry;
 
     // Used to calculate change in temp data
     // data is stored in raw temp format. Uses less memory and does not require floating point math
-    int16_t    mTemps[NbrTempPoints];
-    int16_t    mLongTemps[NbrTempPoints];
-    uint32_t   mTimes[NbrTempPoints];
+    LoopArray<int16_t, 4>   mTemps;
+    LoopArray<int16_t, 4>   mTimes;
+
+    LoopArray<int16_t, 4>   mLongTemps;
 
     // Internal timer used by the loop function
-    uint32_t    mInternalTimer;
+    Timer                   mInternalTimer;
+    Timer                   mLongTempsTimer;
 
+    // Fan pointers
     FanController * mPush;
     FanController * mPull;
 
+    // Temp sensor related to the fan
     TempSensor * mTemp;
 
     uint8_t  calculateRequiredPower();
@@ -63,16 +66,6 @@ public:
 
 
     uint8_t  getFanPower();
-
-    /**
-        Since mTemps and mTimes are used as a circular array mNextEntry keeps track of the head and the end.
-        This function returns the index value that is requested.
-        index = 0 is the first entry
-        index = NbrTempPoints - 1 is the last entry
-        @param[in] index value see above
-        @return array indice
-    */
-    uint8_t  getTempIndice(uint8_t index);
 
     /**
         Adds a temperature into the correct slot in the above array
