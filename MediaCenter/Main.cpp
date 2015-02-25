@@ -130,7 +130,7 @@ float t;
 //    AmplifierTemp.requestTempInC(t,1000);
 //    PowerTemp.requestTempInC(t,1000);
 //    RecieverTemp.requestTempInC(t,1000);
-    sprintf(stats, "Ambient: %f Amp: %f Rec: %f Power: %f \n                   Amp: %u        Rec: %u        Power: %u",
+    sprintf(stats, "Ambient: %f Amp: %f Rec: %f Power: %f \n                   Amp: %u         Rec: %u        Power: %u",
      AmbientTemp.getTempInC(), AmplifierTemp.getTempInC(), RecieverTemp.getTempInC(), PowerTemp.getTempInC(),
       AmplifierPush.isOn() ? AmplifierPush.getSpeed() : 0, RecieverFan.isOn() ? RecieverFan.getSpeed() : 0,
      PowerFan.isOn() ? PowerFan.getSpeed() : 0);
