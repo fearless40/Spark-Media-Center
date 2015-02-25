@@ -47,12 +47,14 @@ protected:
 
     uint8_t    mMode;
 
-// Values set to help determine the best mode of control
-    float       mMaxTempAboveAmbient;
-    float       mWorkingAboveAmbient;
+    // Set to define what the deivces working temperature is. Set this to 0 to force the PID controller to
+    // bring the device down to ambient.
+    // Anything greather than 0 will be added to the ambient temperature to get a new target temperature.
+    int16_t    mWorkingAboveAmbient;
+    int16_t    mWorkingTemperature;
 
-    // Set to allow what value above and below the ambient value that we will accept
-    uint16_t    mAmbientFudgeFactor;
+    // Set to allow what value above and below the ambient value that we will accept when the device is at rest.
+    int16_t    mAmbientFudgeFactor;
 
 
     // Used to calculate change in temp data
