@@ -20,6 +20,8 @@ const float OutMax = 255;
 
 const float OutMin = 0;
 
+const int SampleTime = 2500;
+
 const int LongTempsIntervalTime = 1000 * 60 * 60;   // At 1 minute intervals
 
 
@@ -209,14 +211,52 @@ void FanLogic::setFanPower(uint8_t power)
 
 }
 
+FanLogic::DeviceState FanLogic::getDeviceState()
+{
+    // Please note this function does not use any floating point at all.
+
+    // Guess the device state by looking at the past temperature data.
+    // If the temperature data is around ambient then it is most likely off
+    // If the temperature data is increasing over the long haul it is probably on.
+    // If the temperature data is decreasing over the long haul it is most likely off.
+
+    // Look at the difference in temp over the last 4 minutes (all the data that we have)
+    // Probes have accuracy of 0.0625. Therefore will ignore 0.25 worth of error (4 times error value)
+    const int16_t stddev = 4; // 0.0625 * 4 * 16
+    int counter = 0;
+    for( int loop = 0; loop < LoopArraySize; ++loop )
+    {
+        if( mLongTemps[loop] != EmptyTemp && (abs(mLongTemps[loop] - mTemps.newest()) > stddev )
+        {
+            if (mLongTemps[loop] - mTemps.newest() < 0 )
+                --counter;
+            else if (mLongTemps[loop] - mTemps.newest() > 0 )
+                ++counter;
+        }
+    }
+
+
+    // If we are within the allowed ambient temperature than subtract the counter
+    if( (mTemps.newest() - (mAmbient.getRawTemp() + mAbientFudgeFactor)) <= stddev )
+        --counter;
+
+    if( counter <= -1 )
+        return DeviceState::Off;
+    else if( counter > 1)
+        return DeviceState::On;
+    else
+        return DeviceState::Unknown;
+
+}
+
 uint8_t     FanLogic::calculatePID()
 {
 
     float input = OneWireQue::convertRawTempToC(mTemps.newest());
-    float error = input - (mAmbient->getTempInC() + AmountAboveAmbient);  // Above ambient controls acceptable temperatures
+    float error = input - mTargetValue;
 
+    // As this system can not heat, we shot off if we have a negative value or are as close to 0 as possible.
     if( error <= 0)
-    // If we are cooler than ambient or close to ambient then shut off
     {
         mIterm = 0;
         return 0;

@@ -11,8 +11,13 @@ class FanLogic
 {
 public:
 
-    static const int SampleTime = 2500;
 
+    enum class DeviceState : uint8_t
+    {
+        On,
+        Off,
+        Unknown
+    };
 
 
     enum FanLogicModes
@@ -24,26 +29,38 @@ public:
         FLM_ForceOff        // Try to turn the fans off. If temp too high keep the fans on.
     };
 
+protected:
+
+    static const int LoopArraySize = 4;
 
 // PID Values
-    float       mIterm;
-    float       mLastInput;
-    float       mKi;
-    float       mKd;
-    float       mKp;
-    float       mGoalTemp;
+    float       mIterm;         // Integral term
+    float       mLastInput;     // Last error value
+    float       mKi;            // Constant for integral value
+    float       mKd;            // Constant for derivative value
+    float       mKp;            // Constant for linear value
+    float       mTargetValue;   // The target temperature to reach
 
+
+    /// Calculates the PID value internally
     uint8_t     calculatePID();
 
     uint8_t    mMode;
 
+// Values set to help determine the best mode of control
+    float       mMaxTempAboveAmbient;
+    float       mWorkingAboveAmbient;
+
+    // Set to allow what value above and below the ambient value that we will accept
+    uint16_t    mAmbientFudgeFactor;
+
 
     // Used to calculate change in temp data
     // data is stored in raw temp format. Uses less memory and does not require floating point math
-    LoopArray<int16_t, 4>   mTemps;
-    LoopArray<int16_t, 4>   mTimes;
+    LoopArray<int16_t, LoopArraySize>   mTemps;
+    LoopArray<int16_t, LoopArraySize>   mTimes;
 
-    LoopArray<int16_t, 4>   mLongTemps;
+    LoopArray<int16_t, LoopArraySize>   mLongTemps;
 
     // Internal timer used by the loop function
     Timer                   mInternalTimer;
@@ -68,11 +85,13 @@ public:
     uint8_t  getFanPower();
 
     /**
-        Adds a temperature into the correct slot in the above array
+        Adds a temperature into the correct slot in the above array. Filters out bad data
         @param[in] temp raw value
         @param[id] Hidden value. Autmatically insertes the current milliseconds
     */
     void     addTemp( int16_t temp );
+
+
 
     void init();
 
@@ -89,7 +108,7 @@ public:
     void setup();
     void loop();
 
-
+    DeviceState getDeviceState();
 
     void setTuningParameters( float kp, float ki, float kd );
 
