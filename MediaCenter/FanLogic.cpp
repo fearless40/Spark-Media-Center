@@ -6,7 +6,7 @@
 #include "OneWireQue.h"
 
 
-const int16_t EmptyTemp = 0xC000;
+const int16_t EmptyTemp = 0xFFFF;
 
 const int16_t MaxTemp = 50 * 16;  // About 50 degrees centigrade
 
@@ -22,7 +22,7 @@ const float OutMin = 0;
 
 const int SampleTime = 2500;
 
-const int LongTempsIntervalTime = 1000 * 60 * 60;   // At 1 minute intervals
+const int LongTempsIntervalTime = 1000 * 60;   // At 1 minute intervals
 
 
 TempSensor * FanLogic::mAmbient = nullptr;
@@ -162,7 +162,8 @@ void     FanLogic::addTemp( int16_t temp )
     {
         temp = priorTemp;
     }
-    else if ( mLongTempsTimer.interval( LongTempsIntervalTime ) )
+
+    if ( mLongTempsTimer.interval( LongTempsIntervalTime ) )
     {
         mLongTemps.add( temp );
     }
@@ -214,7 +215,7 @@ void FanLogic::setFanPower(uint8_t power)
 
 }
 
-FanLogic::DeviceState FanLogic::getDeviceState()
+FanLogic::DeviceState FanLogic::getDeviceState(int16_t pidvalue)
 {
     // Please note this function does not use any floating point at all.
 
@@ -225,34 +226,37 @@ FanLogic::DeviceState FanLogic::getDeviceState()
 
     // Look at the difference in temp over the last 4 minutes (all the data that we have)
     // Probes have accuracy of 0.0625. Therefore will ignore 0.25 worth of error (4 times error value)
+
+    pidvalue = pidvalue == -1 ? getFanPower() : pidvalue;
     const int16_t stddev = 4; // 0.0625 * 4 * 16
+    int16_t ambient = mAmbient->getRawTemp() + mAmbientFudgeFactor;
     int counter = 0;
     for( int loop = 0; loop < LoopArraySize; ++loop )
     {
-        if( mLongTemps[loop] != EmptyTemp && (abs(mLongTemps[loop] - mTemps.newest()) > stddev ) )
+        if( mLongTemps[loop] != EmptyTemp && (abs(mLongTemps[loop] - ambient) > stddev ) )
         {
-            if (mLongTemps[loop] - mTemps.newest() < 0 )
+            if (mLongTemps[loop] - ambient < 0 )
                 --counter;
-            else if (mLongTemps[loop] - mTemps.newest() > 0 )
+            else if (mLongTemps[loop] - ambient > 0 )
                 ++counter;
         }
     }
 
 
     // Taking fan speed into effect
-    /*if( getFanPower() > 30 )
+    if( pidvalue > 30 )
         ++counter;
     else
         --counter;
-    */
+
 
     // If we are within the allowed ambient temperature than subtract the counter
     if( (mTemps.newest() - (mAmbient->getRawTemp() + mAmbientFudgeFactor)) <= stddev )
         --counter;
 
-    if( counter <= -1 )
+    if( counter < -1 )
         return DeviceState::Off;
-    else if( counter > 1)
+    else if( counter >= 1)
         return DeviceState::On;
     else
         return DeviceState::Unknown;
@@ -266,11 +270,11 @@ uint8_t     FanLogic::calculatePID()
     float error = input - mTargetValue;
 
     // As this system can not heat, we shot off if we have a negative value or are as close to 0 as possible.
-    if( error <= 0)
+    /*if( error <= 0)
     {
         mIterm = 0;
         return 0;
-    }
+    }*/
 
     mIterm += mKi * error;
 
@@ -300,15 +304,21 @@ uint8_t     FanLogic::calculatePID()
 uint8_t  FanLogic::calculateRequiredPower()
 {
     int16_t target = mAmbient->getRawTemp();
+    uint8_t pid = calculatePID();
 
     switch( getDeviceState() )
     {
-        case DeviceState::Unknown:
-        case DeviceState::On:
-            target += mWorkingAboveAmbient;
-            break;
-        case DeviceState::Off:
-            target += mAmbientFudgeFactor;
+    case DeviceState::Unknown:
+    case DeviceState::On:
+        target += mWorkingAboveAmbient;
+        if( pid < 30 )
+            pid = 30;
+        break;
+    case DeviceState::Off:
+        target += mAmbientFudgeFactor;
+        if( pid < 30 )
+            pid = 0;
+        break;
     }
 
     if( mTemps.newest() > mMaxTemperatureAllowed )
@@ -320,7 +330,8 @@ uint8_t  FanLogic::calculateRequiredPower()
 
     mTargetValue = OneWireQue::convertRawTempToC(target);
 
-    return calculatePID();
+    return pid;
+
 
 }
 

@@ -54,6 +54,8 @@ public:
         // The compiler will optimize this as it sees fit to.
         for( int loop = 1; loop < NumberEntries; ++loop )
             mData[loop-1] = mData[loop];
+
+        mData[NumberEntries-1] = value;
     }
 
     /**

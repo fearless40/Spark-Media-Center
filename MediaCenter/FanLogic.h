@@ -29,7 +29,7 @@ public:
         FLM_ForceOff        // Try to turn the fans off. If temp too high keep the fans on.
     };
 
-protected:
+public:
 
     static const int LoopArraySize = 4;
 
@@ -110,7 +110,7 @@ public:
     void setup(float ambientFudgeFactor, float workingtemp, float maxtemp );
     void loop();
 
-    DeviceState getDeviceState();
+    DeviceState getDeviceState(int16_t pidvalue = -1);
 
     void setTuningParameters( float kp, float ki, float kd );
 

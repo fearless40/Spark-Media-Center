@@ -95,7 +95,7 @@ void setup()
     PowerFan.setup();
     RecieverFan.setup();
 
-    AmplifierLogic.setup(2,10, 43);
+    AmplifierLogic.setup(3,10, 43);
     RecieverLogic.setup(4,6, 36);
     PowerLogic.setup( 3, 5, 30);
 
@@ -126,6 +126,23 @@ case 2:
 
 }
 
+char * DeviceModeToString(FanLogic & l)
+{
+    switch( l.getDeviceState() )
+    {
+        case FanLogic::DeviceState::On:
+            return "On";
+        case FanLogic::DeviceState::Off:
+            return "Off";
+        case FanLogic::DeviceState::Unknown:
+            return "Unknown";
+    }
+}
+float fl(int16_t x)
+{
+    return x/16;
+}
+
 void loop()
 {
 float t;
@@ -134,11 +151,15 @@ float t;
 //    AmplifierTemp.requestTempInC(t,1000);
 //    PowerTemp.requestTempInC(t,1000);
 //    RecieverTemp.requestTempInC(t,1000);
-    sprintf(stats, "Ambient: %f Amp: %f Rec: %f Power: %f \n                   Amp: %u         Rec: %u        Power: %u",
+    sprintf(stats, "Ambient: %f Amp: %f Rec: %f Power: %f \n                   Amp: %u         Rec: %u         Power: %u",
      AmbientTemp.getTempInC(), AmplifierTemp.getTempInC(), RecieverTemp.getTempInC(), PowerTemp.getTempInC(),
       AmplifierPush.isOn() ? AmplifierPush.getSpeed() : 0, RecieverFan.isOn() ? RecieverFan.getSpeed() : 0,
      PowerFan.isOn() ? PowerFan.getSpeed() : 0);
 
+    sprintf(stats2, "Amp mTarget: %f Mode: %s - Rec mTarget: %f Mode: %s - Pow mTarget: %f Mode: %s ", AmplifierLogic.mTargetValue, DeviceModeToString(AmplifierLogic), RecieverLogic.mTargetValue, DeviceModeToString(RecieverLogic), PowerLogic.mTargetValue, DeviceModeToString(PowerLogic));
+
+    sprintf(stats3, "O: %f %f %f N: %f\nO: %f %f %f N: %f", fl(AmplifierLogic.mTemps[0]), fl(AmplifierLogic.mTemps[1]),fl(AmplifierLogic.mTemps[2]),fl(AmplifierLogic.mTemps[3]),
+    fl(AmplifierLogic.mLongTemps[0]),fl(AmplifierLogic.mLongTemps[1]),fl(AmplifierLogic.mLongTemps[2]),fl(AmplifierLogic.mLongTemps[3]));
 
 /*
     if( millis() - milli > 1000 )

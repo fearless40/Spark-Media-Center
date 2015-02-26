@@ -3,6 +3,8 @@
 #ifndef __TIMERCLASS__
 #define __TIMERCLASS__
 
+
+
 class Timer
 {
 protected:

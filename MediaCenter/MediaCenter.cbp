@@ -56,6 +56,7 @@
 		<Unit filename="FanController.h" />
 		<Unit filename="FanLogic.cpp" />
 		<Unit filename="FanLogic.h" />
+		<Unit filename="LoopArray" />
 		<Unit filename="Main.cpp" />
 		<Unit filename="OneWire.cpp" />
 		<Unit filename="OneWire.h" />
@@ -64,6 +65,7 @@
 		<Unit filename="OneWireQue.cpp" />
 		<Unit filename="OneWireQue.h" />
 		<Unit filename="TempSensor.h" />
+		<Unit filename="Timer.h" />
 		<Unit filename="include/FanController.h" />
 		<Unit filename="src/FanController.cpp" />
 		<Extensions>
