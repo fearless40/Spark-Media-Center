@@ -95,6 +95,10 @@ void setup()
     PowerFan.setup();
     RecieverFan.setup();
 
+    AmplifierLogic.setup(2,10, 43);
+    RecieverLogic.setup(4,6, 36);
+    PowerLogic.setup( 3, 5, 30);
+
     Spark.variable("Stats3", stats3,STRING);
     Spark.variable("Stats", stats, STRING );
     Spark.variable("Stats2", stats2, STRING );

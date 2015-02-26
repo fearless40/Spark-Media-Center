@@ -29,8 +29,7 @@ TempSensor * FanLogic::mAmbient = nullptr;
 
 FanLogic::FanLogic() :
     mPush(nullptr),
-    mPull(nullptr),
-    mMode(FanLogic::FLM_Standard)
+    mPull(nullptr)
 {
     init();
 }
@@ -39,7 +38,6 @@ FanLogic::FanLogic() :
 FanLogic::FanLogic( FanController & oneFan, TempSensor & sensor ) :
     mPush(&oneFan),
     mPull(nullptr),
-    mMode(FanLogic::FLM_Standard),
     mTemp(&sensor)
 {
     init();
@@ -48,7 +46,6 @@ FanLogic::FanLogic( FanController & oneFan, TempSensor & sensor ) :
 FanLogic::FanLogic( FanController & push, FanController & pull, TempSensor & sensor ) :
     mPush(&push),
     mPull(&pull),
-    mMode(FanLogic::FLM_Standard),
     mTemp(&sensor)
 {
     init();
@@ -65,6 +62,7 @@ void FanLogic::init()
     mKd = 0.4;
     mKp = 6;
 
+    setup( 2, 4, 45 );
 }
 
 void FanLogic::initalizeFanLogicControllers( TempSensor & ambient )
@@ -75,17 +73,22 @@ void FanLogic::initalizeFanLogicControllers( TempSensor & ambient )
 }
 
 
-void FanLogic::setup()
+void FanLogic::setup( float ambientFudgeFactor, float workingtemp, float maxtemp )
 {
-    // Do nothing for now
+    mAmbientFudgeFactor = (int16_t) ambientFudgeFactor * 16;
+    mWorkingAboveAmbient = (int16_t) workingtemp * 16;
+    mMaxTemperatureAllowed = (int16_t) maxtemp * 16;
 }
 
 void FanLogic::setTuningParameters( float kp, float ki, float kd )
 {
-    float SampleInSec = SampleTime / 1000;
-    mKp = kp / SampleInSec;
-    mKd = kd / SampleInSec;
-    mKi = ki * SampleInSec;
+    if( mIterm != 0 )
+    {
+        mIterm = mIterm * mKi/ki;
+    }
+    mKp = kp;
+    mKd = kd;
+    mKi = ki;
 }
 
 void FanLogic::loop()
@@ -226,7 +229,7 @@ FanLogic::DeviceState FanLogic::getDeviceState()
     int counter = 0;
     for( int loop = 0; loop < LoopArraySize; ++loop )
     {
-        if( mLongTemps[loop] != EmptyTemp && (abs(mLongTemps[loop] - mTemps.newest()) > stddev )
+        if( mLongTemps[loop] != EmptyTemp && (abs(mLongTemps[loop] - mTemps.newest()) > stddev ) )
         {
             if (mLongTemps[loop] - mTemps.newest() < 0 )
                 --counter;
@@ -236,8 +239,15 @@ FanLogic::DeviceState FanLogic::getDeviceState()
     }
 
 
+    // Taking fan speed into effect
+    /*if( getFanPower() > 30 )
+        ++counter;
+    else
+        --counter;
+    */
+
     // If we are within the allowed ambient temperature than subtract the counter
-    if( (mTemps.newest() - (mAmbient.getRawTemp() + mAbientFudgeFactor)) <= stddev )
+    if( (mTemps.newest() - (mAmbient->getRawTemp() + mAmbientFudgeFactor)) <= stddev )
         --counter;
 
     if( counter <= -1 )
@@ -289,11 +299,33 @@ uint8_t     FanLogic::calculatePID()
 
 uint8_t  FanLogic::calculateRequiredPower()
 {
+    int16_t target = mAmbient->getRawTemp();
+
+    switch( getDeviceState() )
+    {
+        case DeviceState::Unknown:
+        case DeviceState::On:
+            target += mWorkingAboveAmbient;
+            break;
+        case DeviceState::Off:
+            target += mAmbientFudgeFactor;
+    }
+
+    if( mTemps.newest() > mMaxTemperatureAllowed )
+    {
+        // todo: Do warning
+        // Set the target temperature to ambient levels to drive the fans to max speed
+        target = mAmbient->getRawTemp();
+    }
+
+    mTargetValue = OneWireQue::convertRawTempToC(target);
 
     return calculatePID();
 
+}
 
-    // Does not worry at the accuracy of the temp. That is checked else where.
+/*
+ // Does not worry at the accuracy of the temp. That is checked else where.
     // This function only worries about what it currently knows and the trend that
     // it is seeing.
 
@@ -386,5 +418,4 @@ uint8_t  FanLogic::calculateRequiredPower()
         currentSpeed = 30;
     }
     return currentSpeed + powerAdjustment;
-
-}
+*/

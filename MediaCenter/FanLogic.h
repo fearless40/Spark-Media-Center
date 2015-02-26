@@ -39,19 +39,19 @@ protected:
     float       mKi;            // Constant for integral value
     float       mKd;            // Constant for derivative value
     float       mKp;            // Constant for linear value
-    float       mTargetValue;   // The target temperature to reach
-
+    float       mTargetValue;   // The target temperature to reach in degree C
 
     /// Calculates the PID value internally
     uint8_t     calculatePID();
-
-    uint8_t    mMode;
 
     // Set to define what the deivces working temperature is. Set this to 0 to force the PID controller to
     // bring the device down to ambient.
     // Anything greather than 0 will be added to the ambient temperature to get a new target temperature.
     int16_t    mWorkingAboveAmbient;
-    int16_t    mWorkingTemperature;
+
+
+    // What temperature should we just override and let the fans run full bore
+    int16_t    mMaxTemperatureAllowed;
 
     // Set to allow what value above and below the ambient value that we will accept when the device is at rest.
     int16_t    mAmbientFudgeFactor;
@@ -107,7 +107,7 @@ public:
 
     static void initalizeFanLogicControllers( TempSensor & ambient );
 
-    void setup();
+    void setup(float ambientFudgeFactor, float workingtemp, float maxtemp );
     void loop();
 
     DeviceState getDeviceState();
