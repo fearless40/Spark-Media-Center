@@ -97,7 +97,7 @@ void setup()
 
     AmplifierLogic.setup(3,10, 43);
     RecieverLogic.setup(4,6, 36);
-    PowerLogic.setup( 3, 5, 30);
+    PowerLogic.setup( 3, 5, 36);
 
     Spark.variable("Stats3", stats3,STRING);
     Spark.variable("Stats", stats, STRING );
